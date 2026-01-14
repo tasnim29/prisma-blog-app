@@ -1,4 +1,8 @@
-import { CommonStatus, Post, PostStatus } from "../../../generated/prisma/client";
+import {
+  CommonStatus,
+  Post,
+  PostStatus,
+} from "../../../generated/prisma/client";
 import { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
 
@@ -101,13 +105,13 @@ const getPost = async ({
     orderBy: {
       [sortBy]: sortOrder,
     },
-    include:{
-      _count:{
-        select:{
-          comments:true
-        }
-      }
-    }
+    include: {
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.post.count({
@@ -145,44 +149,121 @@ const getPostById = async (postId: string) => {
       where: {
         id: postId,
       },
-      include:{
-        comments:{
-          where:{
-            parentId:null,
-            status:CommonStatus.APPROVED
+      include: {
+        comments: {
+          where: {
+            parentId: null,
+            status: CommonStatus.APPROVED,
           },
-          orderBy:{
-            createdAt:"desc"
+          orderBy: {
+            createdAt: "desc",
           },
-          include:{
-            replies:{
-              orderBy:{
-                createdAt:"asc"
+          include: {
+            replies: {
+              orderBy: {
+                createdAt: "asc",
               },
-              include:{
-                replies:{
-                  orderBy:{
-                    createdAt:"asc"
-                  }
-                }
-              }
-            }
-          }
+              include: {
+                replies: {
+                  orderBy: {
+                    createdAt: "asc",
+                  },
+                },
+              },
+            },
+          },
         },
-        _count:{
-          select:{
-            comments:true
-          }
-        }
-        
-      }
+        _count: {
+          select: {
+            comments: true,
+          },
+        },
+      },
     });
     return postData;
   });
+};
+
+const getMyPosts = async (userId: string) => {
+  const activeUser = await prisma.user.findUnique({
+    where: {
+      id: userId,
+      status: "ACTIVE",
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activeUser) {
+    throw new Error("You are not active");
+  }
+
+  const myPosts = await prisma.post.findMany({
+    where: {
+      authorId: userId,
+    },
+    include: {
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
+    },
+  });
+
+  const totalPosts = await prisma.post.count({
+    where: {
+      authorId: userId,
+    },
+  });
+
+  return { myPosts, totalPosts };
+};
+
+// users cant update isFeatured and other post
+// admin can do anything he wants
+const updateMyPost = async (
+  postId: string,
+  userId: string,
+  data: Partial<Post>,
+  isAdmin:boolean
+) => {
+  const postData = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!isAdmin && (postData.authorId !== userId)) {
+    throw new Error("You are not allowed to update the post");
+  }
+  let warning: string | null = null;
+
+  if (!isAdmin && "isFeatured" in data) {
+    delete data.isFeatured;
+    warning = "You cannot update isFeatured";
+  }
+
+  const updatedData = await prisma.post.update({
+    where: {
+      id: postId,
+     
+    },
+    data,
+  });
+  return {updatedData,warning}
 };
 
 export const postService = {
   createPost,
   getPost,
   getPostById,
+  getMyPosts,
+  updateMyPost,
+
 };

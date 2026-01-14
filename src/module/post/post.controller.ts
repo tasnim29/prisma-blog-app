@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { postService } from "./post.service";
 import { PostStatus } from "../../../generated/prisma/enums";
 import paginationSortingHelper from "../../Helpers/paginationSortingHelper";
+import { userRole } from "../../middlewares/auth";
 
 const createPost = async (req: Request, res: Response) => {
   try {
@@ -94,8 +95,63 @@ const getPostById = async (req: Request, res: Response) =>{
   }
 }
 
+
+const getMyPosts = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    // console.log(user)
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const result = await postService.getMyPosts(user.id);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error:any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+const updateMyPost = async (req: Request, res: Response) => {
+  try {
+     const postId = req.params.postId
+    const user = req.user;
+    console.log(user)
+    const isAdmin = user?.role === userRole.ADMIN
+    const data = req.body
+    
+   
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const result = await postService.updateMyPost(postId as string,user.id as string,data,isAdmin as boolean);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      
+    });
+  } catch (error:any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
 export const postController = {
   createPost,
   getPost,
-  getPostById
+  getPostById,
+  getMyPosts,
+  updateMyPost
 };

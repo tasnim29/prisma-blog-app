@@ -25,7 +25,7 @@ export const auth = (...roles: userRole[]) => {
     // get session
     
     try {
-      console.log(req.headers)
+      // console.log(req.headers)
       const session = await betterAuth.api.getSession({
         headers: req.headers as any,
       });

@@ -36,12 +36,12 @@ model Comment {
   content  String  @db.Text
   authorId String
   postId   String
-  post     Post    @relation(fields: [postId], references: [id])
+  post     Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
   parentId String?
   //If parentId is null → this is a top-level comment 
   //If parentId has a value → this comment is a reply
 
-  parent  Comment?  @relation("commentReplies", fields: [parentId], references: [id])
+  parent  Comment?  @relation("commentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies Comment[] @relation("commentReplies")
 
   status    CommonStatus @default(APPROVED)
