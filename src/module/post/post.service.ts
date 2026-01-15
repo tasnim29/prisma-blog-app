@@ -5,6 +5,7 @@ import {
 } from "../../../generated/prisma/client";
 import { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
+import { userRole } from "../../middlewares/auth";
 
 const createPost = async (
   data: Omit<Post, "id" | "createdAt" | "updatedAt" | "authorId">,
@@ -145,7 +146,7 @@ const getPostById = async (postId: string) => {
       },
     });
     // get single data
-    const postData = await prisma.post.findUnique({
+    const postData = await tx.post.findUnique({
       where: {
         id: postId,
       },
@@ -158,11 +159,13 @@ const getPostById = async (postId: string) => {
           orderBy: {
             createdAt: "desc",
           },
+
           include: {
             replies: {
               orderBy: {
                 createdAt: "asc",
               },
+
               include: {
                 replies: {
                   orderBy: {
@@ -227,7 +230,7 @@ const updateMyPost = async (
   postId: string,
   userId: string,
   data: Partial<Post>,
-  isAdmin:boolean
+  isAdmin: boolean
 ) => {
   const postData = await prisma.post.findUniqueOrThrow({
     where: {
@@ -239,7 +242,7 @@ const updateMyPost = async (
     },
   });
 
-  if (!isAdmin && (postData.authorId !== userId)) {
+  if (!isAdmin && postData.authorId !== userId) {
     throw new Error("You are not allowed to update the post");
   }
   let warning: string | null = null;
@@ -252,11 +255,56 @@ const updateMyPost = async (
   const updatedData = await prisma.post.update({
     where: {
       id: postId,
-     
     },
     data,
   });
-  return {updatedData,warning}
+  return { updatedData, warning };
+};
+
+// user can delete his own post and admin can delete all post
+
+const deletePost = async (userId: string, postId: string, isAdmin: boolean) => {
+  const postData = await prisma.post.findUnique({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!postData) {
+    throw new Error("Post not found");
+  }
+
+  if (!isAdmin && postData?.authorId !== userId) {
+    throw new Error("You are not allowed to delete this post");
+  }
+
+  return await prisma.post.delete({
+    where: {
+      id: postId,
+    },
+  });
+};
+
+const getStats = async () => {
+  return await prisma.$transaction(async (tx) => {
+    const [postCount, publishedPost, draftPost,totalComment,approvedComment,totalUser,adminCount,userCount,totalViews] = await Promise.all([
+       tx.post.count(),
+       tx.post.count({ where: { status: PostStatus.PUBLISHED } }),
+       tx.post.count({ where: { status: PostStatus.DRAFT } }),
+       tx.comment.count(),
+       tx.comment.count({ where: { status:CommonStatus.APPROVED } }),
+       tx.user.count(),
+       tx.user.count({where:{role:userRole.ADMIN}}),
+       tx.user.count({where:{role:userRole.USER}}),
+       tx.post.aggregate({_sum:{views:true}})
+    ]);
+
+    return { postCount, publishedPost, draftPost,totalComment,approvedComment,totalUser,adminCount,userCount,totalViews:totalViews._sum.views};
+  });
 };
 
 export const postService = {
@@ -265,5 +313,6 @@ export const postService = {
   getPostById,
   getMyPosts,
   updateMyPost,
-
+  deletePost,
+  getStats,
 };

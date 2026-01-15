@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { postService } from "./post.service";
 import { PostStatus } from "../../../generated/prisma/enums";
 import paginationSortingHelper from "../../Helpers/paginationSortingHelper";
 import { userRole } from "../../middlewares/auth";
 
-const createPost = async (req: Request, res: Response) => {
+const createPost = async (req: Request, res: Response,next:NextFunction) => {
   try {
     console.log(req.user);
     if (!req.user) {
@@ -21,9 +21,7 @@ const createPost = async (req: Request, res: Response) => {
       result,
     });
   } catch (error: any) {
-    res.status(401).json({
-      error: error,
-    });
+    next(error)
   }
 };
 
@@ -52,9 +50,9 @@ const getPost = async (req: Request, res: Response) => {
 
     // console.log(typeof isFeatured)
 
-
-
-    const {limit,page,skip,sortBy,sortOrder}=paginationSortingHelper(req.query)
+    const { limit, page, skip, sortBy, sortOrder } = paginationSortingHelper(
+      req.query
+    );
 
     // console.log("after",tags)
     const result = await postService.getPost({
@@ -67,11 +65,11 @@ const getPost = async (req: Request, res: Response) => {
       page,
       skip,
       sortBy,
-      sortOrder
+      sortOrder,
     });
 
     res.status(201).json({
-       result,
+      result,
     });
   } catch (error) {
     res.status(401).json({
@@ -80,21 +78,20 @@ const getPost = async (req: Request, res: Response) => {
   }
 };
 
-const getPostById = async (req: Request, res: Response) =>{
-  const {postId}= req.params
-  const result = await postService.getPostById(postId as string)
+const getPostById = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+  const result = await postService.getPostById(postId as string);
   try {
     res.status(200).json({
-    success:true,
-    data:result
-  })
+      success: true,
+      data: result,
+    });
   } catch (error) {
     res.status(401).json({
       error: error,
     });
   }
-}
-
+};
 
 const getMyPosts = async (req: Request, res: Response) => {
   try {
@@ -110,48 +107,93 @@ const getMyPosts = async (req: Request, res: Response) => {
       success: true,
       data: result,
     });
-  } catch (error:any) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-
-const updateMyPost = async (req: Request, res: Response) => {
+const updateMyPost = async (req: Request, res: Response,next:NextFunction) => {
   try {
-     const postId = req.params.postId
+    const postId = req.params.postId;
     const user = req.user;
-    console.log(user)
-    const isAdmin = user?.role === userRole.ADMIN
-    const data = req.body
-    
-   
+    console.log(user);
+    const isAdmin = user?.role === userRole.ADMIN;
+    const data = req.body;
+
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const result = await postService.updateMyPost(postId as string,user.id as string,data,isAdmin as boolean);
+    const result = await postService.updateMyPost(
+      postId as string,
+      user.id as string,
+      data,
+      isAdmin as boolean
+    );
 
     res.status(200).json({
       success: true,
       data: result,
-      
     });
-  } catch (error:any) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+  } catch (error: any) {
+    next(error)
   }
 };
 
+const deletePost = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { postId } = req.params;
+    const isAdmin = req.user?.role === userRole.ADMIN;
+
+    console.log(req.user);
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const result = await postService.deletePost(
+      userId as string,
+      postId as string,
+      isAdmin as boolean
+    );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+const getStats = async (req: Request, res: Response) => {
+  try {
+    const result = await postService.getStats();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 export const postController = {
   createPost,
   getPost,
   getPostById,
   getMyPosts,
-  updateMyPost
+  updateMyPost,
+  deletePost,
+  getStats
 };

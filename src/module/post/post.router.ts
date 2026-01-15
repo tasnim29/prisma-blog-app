@@ -9,9 +9,17 @@ router.get("/", postController.getPost);
 
 router.get("/myPosts",auth(userRole.ADMIN,userRole.USER),postController.getMyPosts)
 
+router.get("/stats",postController.getStats)
+
 router.get("/:postId",postController.getPostById)
 
 router.patch("/:postId",auth(userRole.USER,userRole.ADMIN),postController.updateMyPost)
+
+router.delete("/:postId",auth(userRole.USER,userRole.ADMIN),postController.deletePost)
+
+
+
+
 
 
 
